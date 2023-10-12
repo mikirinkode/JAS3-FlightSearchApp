@@ -5,8 +5,13 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "favorite")
 data class Favorite(
-    @PrimaryKey
-    val id: Int,
-    val departure_code: String,
-    val destination_code: Int,
+
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+    val departureId: Int,
+    val departureCode: String,
+    val departureName: String,
+    val destinationId: Int,
+    val destinationCode: String,
+    val destinationName: String,
 )

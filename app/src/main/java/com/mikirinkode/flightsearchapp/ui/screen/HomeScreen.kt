@@ -52,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mikirinkode.flightsearchapp.model.Airport
+import com.mikirinkode.flightsearchapp.model.Favorite
 import com.mikirinkode.flightsearchapp.ui.theme.FlightSearchAppTheme
 import com.mikirinkode.flightsearchapp.ui.viewmodel.AppViewModelProvider
 import com.mikirinkode.flightsearchapp.ui.viewmodel.FlightViewModel
@@ -66,6 +67,7 @@ fun HomeScreen(
     val showFlightList by viewModel.showFlightList
     val searchState by viewModel.searchResultState.collectAsState()
     val flightUiState by viewModel.flightUiState.collectAsState()
+    val favoriteUiState by viewModel.favoriteUiState.collectAsState()
 
     val focusManager = LocalFocusManager.current
 
@@ -80,7 +82,8 @@ fun HomeScreen(
         )
         if (query == "") {
             Text(text = "Favorite Routes", modifier = Modifier.padding(16.dp))
-            if (true) {
+            viewModel.getFavoriteList()
+            if (favoriteUiState.list.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -90,7 +93,13 @@ fun HomeScreen(
                     )
                 }
             } else {
-
+                FavoriteFlightList(list = favoriteUiState.list, onFavoriteClicked = { favorite ->
+                    viewModel.removeFavorite(
+                        departureCode = favorite.departureCode,
+                        destinationCode = favorite.destinationCode
+                    )
+                    viewModel.getFavoriteList()
+                })
             }
         } else {
             if (!showFlightList) {
@@ -110,8 +119,23 @@ fun HomeScreen(
                         }
                         FlightList(
                             selectedAirport = selectedAirport,
-                            list = flightUiState.list,
-                            onFavoriteClicked = { /*TODO*/ })
+                            map = flightUiState.map,
+                            onFavoriteClicked = { destinationAirport, isFavorite ->
+
+                                if (isFavorite) {
+                                    viewModel.removeFavorite(
+                                        departureCode = selectedAirport.iata_code,
+                                        destinationCode = destinationAirport.iata_code
+                                    )
+                                } else {
+                                    viewModel.insertFavorite(
+                                        departureAirport = selectedAirport,
+                                        destinationAirport = destinationAirport
+                                    )
+                                }
+                                viewModel.getFavoriteList()
+                                viewModel.showFlightList(selectedAirport)
+                            })
                     }
                 }
             }
@@ -240,49 +264,61 @@ fun SearchBar(
     )
 }
 
-//@Composable
-//fun FavoriteFlightList(
-//    list: List<String>,
-//    onFavoriteClicked: () -> Unit,
-//    modifier: Modifier = Modifier
-//) {
-//    LazyColumn(
-//        contentPadding = PaddingValues(bottom = 16.dp)
-//    ) {
-//        items(list) {
-//            FlightItemCard(
-//                isFavorite = true,
-//                onFavoriteClicked = onFavoriteClicked,
-//            )
-//        }
-//    }
-//}
-
 @Composable
-fun FlightList(
-    selectedAirport: Airport,
-    list: List<Airport>,
-    onFavoriteClicked: () -> Unit,
+fun FavoriteFlightList(
+    list: List<Favorite>,
+    onFavoriteClicked: (Favorite) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         contentPadding = PaddingValues(bottom = 16.dp),
         modifier = modifier
     ) {
-        items(list) { airport ->
+        items(list) { favorite ->
+            FlightItemCard(
+                departureCode = favorite.departureCode,
+                departureName = favorite.departureName,
+                arriveCode = favorite.destinationCode,
+                arriveName = favorite.destinationName,
+                isFavorite = true,
+                onFavoriteClicked = { onFavoriteClicked(favorite) }
+            )
+        }
+    }
+}
+
+@Composable
+fun FlightList(
+    selectedAirport: Airport,
+    map: Map<Airport, Boolean>,
+    onFavoriteClicked: (destinationAirport: Airport, isFavorite: Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = 16.dp),
+        modifier = modifier
+    ) {
+        items(map.keys.toList()) { airport ->
+            var isFavorite by remember {
+                mutableStateOf(map[airport] ?: false)
+            }
             FlightItemCard(
                 departureCode = selectedAirport.iata_code,
                 departureName = selectedAirport.name,
                 arriveCode = airport.iata_code,
                 arriveName = airport.name,
-                onFavoriteClicked = { /*TODO*/ })
+                isFavorite = isFavorite,
+                onFavoriteClicked = {
+                    onFavoriteClicked(airport, isFavorite)
+                    isFavorite = !isFavorite
+                })
         }
     }
 }
 
 @Composable
 fun FlightItemCard(
-    isFavorite: Boolean = false,
+    isFavorite: Boolean,
     departureCode: String,
     departureName: String,
     arriveCode: String,
@@ -332,7 +368,9 @@ fun FlightItemCard(
                     Text(text = arriveName)
                 }
             }
-            IconButton(onClick = onFavoriteClicked) {
+            IconButton(onClick = {
+                onFavoriteClicked()
+            }) {
                 Icon(
                     imageVector = if (isFavorite) {
                         Icons.Sharp.Star

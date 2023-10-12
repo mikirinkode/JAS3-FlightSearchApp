@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mikirinkode.flightsearchapp.data.FlightRepository
 import com.mikirinkode.flightsearchapp.model.Airport
+import com.mikirinkode.flightsearchapp.model.Favorite
 import com.mikirinkode.flightsearchapp.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,19 +37,52 @@ class FlightViewModel(
     val flightUiState get() = _flightUiState
 
 
+    private val _favoriteUiState: MutableStateFlow<FavoriteUiState> =
+        MutableStateFlow(FavoriteUiState())
+    val favoriteUiState get() = _favoriteUiState
+
+
     private val _selectedAirport: MutableStateFlow<Airport?> =
         MutableStateFlow(null)
     val selectedAirport get() = _selectedAirport.value
-
 
 
     fun clearQuery() {
         _query.value = ""
     }
 
-    fun insertFavorite(departureCode: String, destinationCode: String){
-        viewModelScope.launch {
+    init {
+        getFavoriteList()
+    }
 
+    fun getFavoriteList() {
+        viewModelScope.launch {
+            flightRepository.getFavoriteList()
+                .catch { }
+                .collect {
+                    _favoriteUiState.value = FavoriteUiState(it)
+                }
+        }
+    }
+
+    fun insertFavorite(departureAirport: Airport, destinationAirport: Airport) {
+        viewModelScope.launch {
+            flightRepository.insertFavorite(
+                Favorite(
+                    departureId = departureAirport.id,
+                    departureName = departureAirport.name,
+                    departureCode = departureAirport.iata_code,
+                    destinationId = destinationAirport.id,
+                    destinationName = destinationAirport.name,
+                    destinationCode = destinationAirport.iata_code
+                )
+            )
+        }
+    }
+
+    fun removeFavorite(departureCode: String, destinationCode: String) {
+        viewModelScope.launch {
+            flightRepository.removeFavorite(departureCode, destinationCode)
         }
     }
 
@@ -59,23 +93,33 @@ class FlightViewModel(
         Log.e(TAG, "query: $query")
         viewModelScope.launch {
             flightRepository.searchAirport(query)
-                .catch {  }
-                .collect{
+                .catch { }
+                .collect {
                     Log.e(TAG, "search result size: ${it.size}")
                     _searchResultState.value = SearchUiState(it)
                 }
         }
     }
 
-    fun showFlightList(airport: Airport){
-        _selectedAirport.value = airport
+    fun showFlightList(departureAirport: Airport) {
+        _selectedAirport.value = departureAirport
         _showFlightList.value = true
         viewModelScope.launch {
             flightRepository.getAirportList()
-                .catch {  }
-                .collect{
-                    Log.e(TAG, "search result size: ${it.size}")
-                    _flightUiState.value = FlightUiState(it)
+                .catch { }
+                .collect { airportList ->
+
+                    val destinationList = airportList
+                    val favoriteList = _favoriteUiState.value.list
+                    val result: MutableMap<Airport, Boolean> = mutableMapOf()
+
+                    destinationList.forEach { destinationAirport ->
+                        val favoriteItem =
+                            favoriteList.firstOrNull { it.departureId == departureAirport.id && it.destinationId == destinationAirport.id }
+                        result[destinationAirport] = favoriteItem != null
+                    }
+
+                    _flightUiState.value = FlightUiState(result)
                 }
         }
     }
@@ -86,4 +130,5 @@ class FlightViewModel(
 }
 
 data class SearchUiState(val list: List<Airport> = listOf())
-data class FlightUiState(val list: List<Airport> = listOf())
+data class FlightUiState(val map: Map<Airport, Boolean> = mapOf<Airport, Boolean>())
+data class FavoriteUiState(val list: List<Favorite> = listOf())
