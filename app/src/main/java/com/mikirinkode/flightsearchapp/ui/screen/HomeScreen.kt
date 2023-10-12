@@ -202,15 +202,16 @@ fun AirportItem(
             modifier = Modifier
                 .background(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = MaterialTheme.shapes.medium
+                    shape = CutCornerShape(bottomEnd = 16.dp)
                 )
-                .clip(shape = MaterialTheme.shapes.medium)
+                .clip(shape = CutCornerShape(bottomEnd = 16.dp))
                 .clickable(onClick = onAirportClicked)
                 .padding(8.dp)
         ) {
             Text(iataCode, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(8.dp))
             Text(name)
+            Spacer(modifier = Modifier.width(8.dp))
         }
     }
 }
@@ -264,13 +265,13 @@ fun SearchBar(
             .padding(top = 16.dp, start = 16.dp, end = 16.dp)
             .background(
                 color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.medium
+//                shape = MaterialTheme.shapes.medium
             )
             .fillMaxWidth()
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.primary,
-                shape = MaterialTheme.shapes.medium
+//                shape = MaterialTheme.shapes.medium
             ),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(
