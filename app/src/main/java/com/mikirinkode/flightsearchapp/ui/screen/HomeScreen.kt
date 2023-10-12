@@ -1,5 +1,6 @@
 package com.mikirinkode.flightsearchapp.ui.screen
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,6 +71,20 @@ fun HomeScreen(
     val favoriteUiState by viewModel.favoriteUiState.collectAsState()
 
     val focusManager = LocalFocusManager.current
+
+    var lastQueryObserved by remember { mutableStateOf(false) }
+
+    viewModel.lastQueryState.collectAsState().value.let {
+        Log.e("HomeScreen", "observed: ${lastQueryObserved}")
+        if (!lastQueryObserved){
+            if (it.query != ""){
+                viewModel.updateQuery(it.query)
+                viewModel.searchAirport(it.query)
+                lastQueryObserved = true
+            }
+        }
+        Log.e("HomeScreen", "value: $it.")
+    }
 
     Column(
         modifier = modifier

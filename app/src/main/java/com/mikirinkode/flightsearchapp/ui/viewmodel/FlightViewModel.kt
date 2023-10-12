@@ -6,19 +6,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mikirinkode.flightsearchapp.data.FlightRepository
+import com.mikirinkode.flightsearchapp.data.UserPreferenceRepository
 import com.mikirinkode.flightsearchapp.model.Airport
 import com.mikirinkode.flightsearchapp.model.Favorite
 import com.mikirinkode.flightsearchapp.ui.common.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class FlightViewModel(
-    private val flightRepository: FlightRepository
+    private val flightRepository: FlightRepository,
+    private val userPreferenceRepository: UserPreferenceRepository
 ) : ViewModel() {
 
     private val _query = mutableStateOf("")
@@ -47,12 +52,54 @@ class FlightViewModel(
     val selectedAirport get() = _selectedAirport.value
 
 
+    val lastQueryState: StateFlow<LastQueryUiState> = userPreferenceRepository.userSearchQuery.map {
+//        Log.e(TAG, "last query state: $it")
+//        if (it != "") {
+//            _query.value = it
+//            searchAirport(it)
+//        }
+        LastQueryUiState(it)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LastQueryUiState()
+    )
+
+    fun updateQuery(query: String){
+        _query.value = query
+    }
     fun clearQuery() {
         _query.value = ""
+        viewModelScope.launch {
+            userPreferenceRepository.saveUserSearchQuery("")
+        }
     }
 
     init {
+        Log.e(TAG, "on init called")
+        viewModelScope.launch {
+            Log.e(TAG, "last query: ${lastQueryState.value.query}")
+
+            Log.e(TAG, "last query fun: ${userPreferenceRepository.lastQuery}")
+            userPreferenceRepository.lastQuery.onEach {
+                Log.e(TAG, "aduh ${it}")
+            }
+        }
+        checkLastQuery()
         getFavoriteList()
+    }
+
+    fun checkLastQuery() {
+        Log.e(TAG, "get check last query called")
+        viewModelScope.launch {
+            userPreferenceRepository.userSearchQuery.map {
+                Log.e(TAG, "last query: $it")
+                if (it != "") {
+                    _query.value = it
+                    searchAirport(it)
+                }
+            }
+        }
     }
 
     fun getFavoriteList() {
@@ -102,9 +149,14 @@ class FlightViewModel(
     }
 
     fun showFlightList(departureAirport: Airport) {
+
         _selectedAirport.value = departureAirport
         _showFlightList.value = true
         viewModelScope.launch {
+            // save user query
+            Log.e(TAG, "Save query called")
+            userPreferenceRepository.saveUserSearchQuery(query.value)
+
             flightRepository.getAirportList()
                 .catch { }
                 .collect { airportList ->
@@ -129,6 +181,7 @@ class FlightViewModel(
     }
 }
 
+data class LastQueryUiState(val query: String = "")
 data class SearchUiState(val list: List<Airport> = listOf())
 data class FlightUiState(val map: Map<Airport, Boolean> = mapOf<Airport, Boolean>())
 data class FavoriteUiState(val list: List<Favorite> = listOf())
